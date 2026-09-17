@@ -10,7 +10,8 @@ from packages.domain.seed import seed_database
 
 
 @pytest.fixture()
-def client():
+def client(monkeypatch):
+    monkeypatch.setenv("EMAIL_DELIVERY_MODE", "console")
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},

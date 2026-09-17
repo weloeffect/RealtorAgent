@@ -30,6 +30,17 @@ class MockConversationAgent:
     def reset(self) -> None:
         self.sessions.clear()
 
+    def preferences_for(self, session_id: str) -> PropertySearch | None:
+        context = self.sessions.get(session_id)
+        if context is None:
+            return None
+        return PropertySearch(
+            city=context.city,
+            transaction_type=context.transaction_type,
+            budget_max=context.budget_max,
+            bedrooms_min=context.bedrooms_min,
+        )
+
     def respond(self, session: Session, session_id: str, message: str) -> ConversationReply:
         context = self.sessions.setdefault(
             session_id, SessionContext(machine=ConversationSession(session_id=session_id))
@@ -102,7 +113,17 @@ class MockConversationAgent:
 
     @staticmethod
     def _extract_preferences(context: SessionContext, text: str) -> None:
-        cities = {"paris": "Paris", "lyon": "Lyon", "bordeaux": "Bordeaux"}
+        cities = {
+            "paris": "Paris",
+            "lyon": "Lyon",
+            "bordeaux": "Bordeaux",
+            "nice": "Nice",
+            "toulouse": "Toulouse",
+            "lille": "Lille",
+            "nantes": "Nantes",
+            "montpellier": "Montpellier",
+            "strasbourg": "Strasbourg",
+        }
         for token, city in cities.items():
             if token in text:
                 context.city = city
@@ -110,9 +131,22 @@ class MockConversationAgent:
             context.transaction_type = TransactionType.rent
         if any(word in text for word in ("buy", "purchase", "sale")):
             context.transaction_type = TransactionType.sale
-        bedroom_match = re.search(r"(\d+)\s*(?:bed|bedroom)", text)
+        bedroom_words = {
+            "studio": 0,
+            "one": 1,
+            "two": 2,
+            "three": 3,
+            "four": 4,
+            "five": 5,
+        }
+        bedroom_match = re.search(
+            r"(\d+|studio|one|two|three|four|five)[\s-]*(?:bed|bedroom)", text
+        )
         if bedroom_match:
-            context.bedrooms_min = int(bedroom_match.group(1))
+            bedroom_value = bedroom_match.group(1)
+            context.bedrooms_min = (
+                int(bedroom_value) if bedroom_value.isdigit() else bedroom_words[bedroom_value]
+            )
         budget_match = re.search(r"(?:budget|max|under|up to)\D{0,12}([\d,.]+)\s*([km]?)", text)
         if budget_match:
             raw = budget_match.group(1).replace(",", "").replace(".", "")

@@ -3,7 +3,7 @@ import "./styles.css";
 
 export const metadata: Metadata = {
   title: "Horizon Homes Voice Concierge",
-  description: "Local mocked real-estate voice agent",
+  description: "A private AI concierge for finding exceptional homes and arranging viewings.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -13,4 +13,3 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     </html>
   );
 }
-

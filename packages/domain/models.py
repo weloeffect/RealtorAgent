@@ -5,7 +5,17 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from enum import StrEnum
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -76,6 +86,21 @@ class Lead(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class LeadPreference(Base):
+    __tablename__ = "lead_preferences"
+
+    lead_id: Mapped[str] = mapped_column(ForeignKey("leads.id"), primary_key=True)
+    city: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    transaction_type: Mapped[TransactionType | None] = mapped_column(
+        Enum(TransactionType), nullable=True
+    )
+    budget_max: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    bedrooms_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
 class ViewingSlot(Base):
     __tablename__ = "viewing_slots"
 
@@ -100,5 +125,68 @@ class Viewing(Base):
     lead_id: Mapped[str] = mapped_column(ForeignKey("leads.id"), index=True)
     status: Mapped[str] = mapped_column(String(20), default="confirmed")
     confirmation_channel: Mapped[str] = mapped_column(String(20), default="browser")
+    confirmation_email_status: Mapped[str] = mapped_column(String(20), default="pending")
+    confirmation_email_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     idempotency_key: Mapped[str] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CallSession(Base):
+    __tablename__ = "calls"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    session_id: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    agency_id: Mapped[str] = mapped_column(ForeignKey("agencies.id"), index=True)
+    lead_id: Mapped[str] = mapped_column(ForeignKey("leads.id"), index=True)
+    booking_id: Mapped[str | None] = mapped_column(
+        ForeignKey("viewings.id"), nullable=True, unique=True
+    )
+    mode: Mapped[str] = mapped_column(String(20), default="browser_text")
+    status: Mapped[str] = mapped_column(String(20), default="active", index=True)
+    model_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    disposition: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class CallTurn(Base):
+    __tablename__ = "call_turns"
+    __table_args__ = (UniqueConstraint("call_id", "sequence", name="uq_call_turn_sequence"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    call_id: Mapped[str] = mapped_column(ForeignKey("calls.id"), index=True)
+    sequence: Mapped[int] = mapped_column(Integer)
+    speaker: Mapped[str] = mapped_column(String(20))
+    text: Mapped[str] = mapped_column(Text)
+    interrupted: Mapped[bool] = mapped_column(Boolean, default=False)
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ToolExecution(Base):
+    __tablename__ = "tool_executions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    call_id: Mapped[str] = mapped_column(ForeignKey("calls.id"), index=True)
+    tool_name: Mapped[str] = mapped_column(String(80))
+    arguments_redacted: Mapped[str] = mapped_column(Text)
+    result_redacted: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20))
+    latency_ms: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PropertyMatch(Base):
+    __tablename__ = "property_matches"
+    __table_args__ = (
+        UniqueConstraint("call_id", "property_id", name="uq_property_match_call_property"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid4_str)
+    call_id: Mapped[str] = mapped_column(ForeignKey("calls.id"), index=True)
+    property_id: Mapped[str] = mapped_column(ForeignKey("properties.id"), index=True)
+    rank: Mapped[int] = mapped_column(Integer)
+    presented_to_caller: Mapped[bool] = mapped_column(Boolean, default=True)

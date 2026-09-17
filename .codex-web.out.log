@@ -1,0 +1,17 @@
+
+> real-estate-agent-console@0.1.0 dev
+> next dev
+
+▲ Next.js 16.3.5 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.56.1:3000
+✓ Ready in 9.2s
+✓ Running next.config.mjs took 66ms
+
+ GET / 200 in 1519ms (next.js: 1188ms, application-code: 331ms)
+ GET / 200 in 145ms (next.js: 21ms, application-code: 124ms)
+✓ Compiled in 104ms
+ GET / 200 in 82ms (next.js: 28ms, application-code: 53ms)
+✓ Compiled in 13ms
+ GET / 200 in 38ms (next.js: 17ms, application-code: 22ms)
+✓ Compiled in 69ms

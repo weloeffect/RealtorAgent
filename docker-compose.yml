@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile.api
     environment:
       DATABASE_URL: postgresql+psycopg://realestate:realestate@postgres:5432/realestate
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      QWEN_REALTIME_MODEL: ${QWEN_REALTIME_MODEL:-qwen3.5-omni-flash-realtime}
     ports:
       - "8000:8000"
     depends_on:
@@ -44,4 +46,3 @@ services:
 
 volumes:
   postgres_data:
-

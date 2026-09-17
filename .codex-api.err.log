@@ -1,0 +1,18 @@
+INFO:     Started server process [25040]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:60201 - "WebSocket /ws/qwen-realtime?call_id=edc6eff0-745c-4321-827e-8606b63efe67" [accepted]
+INFO:     connection open
+Qwen realtime proxy failed
+Traceback (most recent call last):
+  File "C:\Users\walee\Documents\Codex\RealEstate\apps\api\main.py", line 389, in qwen_realtime
+    task.result()
+  File "C:\Users\walee\Documents\Codex\RealEstate\apps\api\main.py", line 353, in forward_qwen_events
+    async for raw in upstream:
+  File "C:\Users\walee\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\Lib\site-packages\websockets\asyncio\connection.py", line 244, in __aiter__
+    yield await self.recv()
+          ^^^^^^^^^^^^^^^^^
+  File "C:\Users\walee\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\Lib\site-packages\websockets\asyncio\connection.py", line 324, in recv
+    raise self.protocol.close_exc from self.recv_exc
+websockets.exceptions.ConnectionClosedError: received 1007 (invalid frame payload data) Your session was closed because no response was generated for 300 seconds.; then sent 1007 (invalid frame payload data) Your session was closed because no response was generated for 300 seconds.

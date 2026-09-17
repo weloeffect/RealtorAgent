@@ -5,7 +5,7 @@
 The implementation follows `real_estate_voice_agent_implementation_plan.md`. Keep additions within the established layout:
 
 - `apps/api/` contains the FastAPI service and tests; reserve `apps/voice_gateway/` and `apps/worker/` for later Python services.
-- `apps/web/` contains the Next.js/TypeScript console and text-call demo.
+- `apps/web/` contains the Next.js/TypeScript voice/text console and call-review UI.
 - `packages/domain/`, `packages/tools/`, and `packages/providers/` for reusable business rules, model tools, and external-service adapters.
 - `packages/prompts/` and `packages/evals/` for versioned prompts, scenarios, rubrics, and reports.
 - `infra/docker/` and `infra/deploy/` for local and deployment configuration; `docs/architecture/` for decisions, diagrams, and runbooks.

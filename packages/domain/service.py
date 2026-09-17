@@ -1,11 +1,31 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from sqlalchemy import Select, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .models import Agency, Lead, Property, SlotStatus, Viewing, ViewingSlot
-from .schemas import BookingCreate, LeadCreate, PropertySearch
+from .models import (
+    Agency,
+    CallSession,
+    CallTurn,
+    Lead,
+    LeadPreference,
+    Property,
+    PropertyMatch,
+    SlotStatus,
+    Viewing,
+    ViewingSlot,
+)
+from .schemas import (
+    BookingCreate,
+    CallCreate,
+    CallTurnCreate,
+    LeadCreate,
+    LeadUpdate,
+    PropertySearch,
+)
 
 
 class NotFoundError(Exception):
@@ -67,6 +87,92 @@ class RealEstateService:
             raise NotFoundError("Lead not found")
         return lead
 
+    def update_lead(self, lead_id: str, payload: LeadUpdate) -> Lead:
+        lead = self.get_lead(lead_id)
+        for field, value in payload.model_dump(exclude_unset=True).items():
+            setattr(lead, field, value)
+        self.session.commit()
+        self.session.refresh(lead)
+        return lead
+
+    def create_call(self, payload: CallCreate, model_id: str | None = None) -> CallSession:
+        existing = self.session.scalar(
+            select(CallSession).where(CallSession.session_id == payload.session_id)
+        )
+        if existing is not None:
+            return existing
+        lead = Lead(agency_id=self.default_agency().id, contact_consent_status="unknown")
+        self.session.add(lead)
+        self.session.flush()
+        call = CallSession(
+            session_id=payload.session_id,
+            agency_id=lead.agency_id,
+            lead_id=lead.id,
+            mode=payload.mode,
+            model_id=model_id,
+        )
+        self.session.add(call)
+        self.session.commit()
+        self.session.refresh(call)
+        return call
+
+    def get_call(self, call_id: str) -> CallSession:
+        call = self.session.get(CallSession, call_id)
+        if call is None:
+            raise NotFoundError("Call not found")
+        return call
+
+    def add_turn(self, call_id: str, payload: CallTurnCreate) -> CallTurn:
+        self.get_call(call_id)
+        sequence = self.session.scalar(
+            select(func.coalesce(func.max(CallTurn.sequence), 0)).where(CallTurn.call_id == call_id)
+        )
+        turn = CallTurn(call_id=call_id, sequence=int(sequence) + 1, **payload.model_dump())
+        self.session.add(turn)
+        self.session.commit()
+        self.session.refresh(turn)
+        return turn
+
+    def update_preferences(self, call: CallSession, filters: PropertySearch) -> LeadPreference:
+        preference = self.session.get(LeadPreference, call.lead_id)
+        if preference is None:
+            preference = LeadPreference(lead_id=call.lead_id)
+            self.session.add(preference)
+        for field in ("city", "transaction_type", "budget_max", "bedrooms_min"):
+            value = getattr(filters, field)
+            if value is not None:
+                setattr(preference, field, value)
+        self.session.flush()
+        return preference
+
+    def record_matches(self, call_id: str, properties: list[Property]) -> None:
+        existing = set(
+            self.session.scalars(
+                select(PropertyMatch.property_id).where(PropertyMatch.call_id == call_id)
+            ).all()
+        )
+        for rank, property_record in enumerate(properties, start=1):
+            if property_record.id not in existing:
+                self.session.add(
+                    PropertyMatch(call_id=call_id, property_id=property_record.id, rank=rank)
+                )
+
+    def complete_call(self, call_id: str) -> CallSession:
+        call = self.get_call(call_id)
+        turns = list(
+            self.session.scalars(
+                select(CallTurn).where(CallTurn.call_id == call_id).order_by(CallTurn.sequence)
+            ).all()
+        )
+        caller_text = " ".join(turn.text for turn in turns if turn.speaker == "caller")
+        call.summary = caller_text[:700] if caller_text else "No caller transcript was captured."
+        call.status = "completed"
+        call.ended_at = datetime.now(UTC)
+        call.disposition = "viewing_booked" if call.booking_id else "enquiry"
+        self.session.commit()
+        self.session.refresh(call)
+        return call
+
     def get_slots(self, property_id: str) -> list[ViewingSlot]:
         self.get_property(property_id)
         query = (
@@ -78,6 +184,11 @@ class RealEstateService:
         return list(self.session.scalars(query).all())
 
     def book_viewing(self, payload: BookingCreate) -> Viewing:
+        call = None
+        if payload.call_id:
+            call = self.get_call(payload.call_id)
+            if call.lead_id != payload.lead_id:
+                raise ConflictError("Booking lead does not belong to this call")
         existing = self.session.scalar(
             select(Viewing).where(Viewing.idempotency_key == payload.idempotency_key)
         )
@@ -112,4 +223,7 @@ class RealEstateService:
                 return repeated
             raise ConflictError("Viewing slot is no longer available") from exc
         self.session.refresh(viewing)
+        if call:
+            call.booking_id = viewing.id
+            self.session.commit()
         return viewing

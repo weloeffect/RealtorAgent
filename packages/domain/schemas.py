@@ -61,6 +61,22 @@ class LeadRead(LeadCreate):
     created_at: datetime
 
 
+class LeadUpdate(BaseModel):
+    name: str | None = Field(None, max_length=120)
+    phone_e164: str | None = Field(None, pattern=r"^\+[1-9]\d{7,14}$")
+    email: str | None = Field(None, max_length=254)
+    contact_consent_status: str | None = Field(None, pattern="^(unknown|granted|declined)$")
+
+
+class LeadPreferenceRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    city: str | None
+    transaction_type: TransactionType | None
+    budget_max: Decimal | None
+    bedrooms_min: int | None
+    updated_at: datetime
+
+
 class ViewingSlotRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
@@ -75,6 +91,7 @@ class BookingCreate(BaseModel):
     lead_id: str
     idempotency_key: str = Field(min_length=8, max_length=100)
     confirmed: bool
+    call_id: str | None = None
 
 
 class BookingRead(BaseModel):
@@ -84,6 +101,8 @@ class BookingRead(BaseModel):
     lead_id: str
     status: str
     confirmation_channel: str
+    confirmation_email_status: str
+    confirmation_email_sent_at: datetime | None
     idempotency_key: str
     created_at: datetime
 
@@ -91,6 +110,7 @@ class BookingRead(BaseModel):
 class ConversationMessage(BaseModel):
     session_id: str = Field(min_length=1, max_length=100)
     message: str = Field(min_length=1, max_length=1000)
+    call_id: str | None = None
 
 
 class ConversationReply(BaseModel):
@@ -98,3 +118,62 @@ class ConversationReply(BaseModel):
     state: str
     reply: str
     properties: list[PropertyRead] = Field(default_factory=list)
+
+
+class CallCreate(BaseModel):
+    session_id: str = Field(min_length=1, max_length=100)
+    mode: str = Field(pattern="^(browser_text|browser_voice)$")
+
+
+class CallTurnCreate(BaseModel):
+    speaker: str = Field(pattern="^(caller|assistant)$")
+    text: str = Field(min_length=1, max_length=10_000)
+    interrupted: bool = False
+    latency_ms: int | None = Field(None, ge=0, le=600_000)
+
+
+class CallTurnRead(CallTurnCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    sequence: int
+    created_at: datetime
+
+
+class ToolExecutionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    tool_name: str
+    arguments_redacted: str
+    result_redacted: str
+    status: str
+    latency_ms: int
+    created_at: datetime
+
+
+class PropertyMatchRead(BaseModel):
+    property: PropertyRead
+    rank: int
+
+
+class CallRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    session_id: str
+    lead_id: str
+    booking_id: str | None
+    mode: str
+    status: str
+    model_id: str | None
+    summary: str | None
+    disposition: str | None
+    started_at: datetime
+    ended_at: datetime | None
+
+
+class CallDetail(CallRead):
+    lead: LeadRead
+    preferences: LeadPreferenceRead | None
+    turns: list[CallTurnRead]
+    tools: list[ToolExecutionRead]
+    matches: list[PropertyMatchRead]
+    booking: BookingRead | None
