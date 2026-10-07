@@ -9,6 +9,7 @@ from email.message import EmailMessage
 from html import escape
 from pathlib import Path
 
+import httpx
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,9 @@ class EmailConfig:
     from_email: str
     use_ssl: bool
     start_tls: bool
+    from_name: str
+    brevo_api_key: str
+    brevo_api_url: str
 
     @classmethod
     def from_env(cls) -> EmailConfig:
@@ -42,6 +46,11 @@ class EmailConfig:
             from_email=os.getenv("BOOKING_FROM_EMAIL", "").strip() or username,
             use_ssl=os.getenv("SMTP_USE_SSL", "false").strip().lower() == "true",
             start_tls=os.getenv("SMTP_START_TLS", "true").strip().lower() == "true",
+            from_name=os.getenv("BOOKING_FROM_NAME", "Horizon Homes").strip(),
+            brevo_api_key=os.getenv("BREVO_API_KEY", "").strip(),
+            brevo_api_url=os.getenv(
+                "BREVO_API_URL", "https://api.brevo.com/v3/smtp/email"
+            ).strip(),
         )
 
 
@@ -68,8 +77,12 @@ class EmailConfirmationSender:
                 confirmation.booking_reference,
             )
             return "simulated"
+        if self.config.mode == "brevo":
+            return self._send_with_brevo(message, confirmation)
         if self.config.mode != "smtp":
-            raise EmailConfigurationError("EMAIL_DELIVERY_MODE must be console or smtp")
+            raise EmailConfigurationError(
+                "EMAIL_DELIVERY_MODE must be console, smtp, or brevo"
+            )
         if not self.config.host or not self.config.from_email:
             raise EmailConfigurationError("SMTP_HOST and BOOKING_FROM_EMAIL are required")
 
@@ -80,6 +93,41 @@ class EmailConfirmationSender:
             if self.config.username:
                 smtp.login(self.config.username, self.config.password)
             smtp.send_message(message)
+        return "sent"
+
+    def _send_with_brevo(
+        self, message: EmailMessage, confirmation: ViewingConfirmation
+    ) -> str:
+        if not self.config.brevo_api_key or not self.config.from_email:
+            raise EmailConfigurationError(
+                "BREVO_API_KEY and BOOKING_FROM_EMAIL are required"
+            )
+        html_body = message.get_body(preferencelist=("html",))
+        response = httpx.post(
+            self.config.brevo_api_url,
+            headers={
+                "accept": "application/json",
+                "api-key": self.config.brevo_api_key,
+                "content-type": "application/json",
+            },
+            json={
+                "sender": {
+                    "name": self.config.from_name or "Horizon Homes",
+                    "email": self.config.from_email,
+                },
+                "to": [
+                    {
+                        "name": confirmation.booker_name,
+                        "email": confirmation.recipient,
+                    }
+                ],
+                "subject": str(message["Subject"]),
+                "htmlContent": html_body.get_content() if html_body else "",
+                "tags": ["viewing-confirmation"],
+            },
+            timeout=15,
+        )
+        response.raise_for_status()
         return "sent"
 
     def _build_message(self, confirmation: ViewingConfirmation) -> EmailMessage:

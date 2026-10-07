@@ -5,8 +5,20 @@ services:
       dockerfile: Dockerfile.api
     environment:
       DATABASE_URL: postgresql+psycopg://realestate:realestate@postgres:5432/realestate
+      WEB_ORIGIN: http://localhost:3000
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
       QWEN_REALTIME_MODEL: ${QWEN_REALTIME_MODEL:-qwen3.5-omni-flash-realtime}
+      EMAIL_DELIVERY_MODE: ${EMAIL_DELIVERY_MODE:-console}
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      BREVO_API_URL: ${BREVO_API_URL:-https://api.brevo.com/v3/smtp/email}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_START_TLS: ${SMTP_START_TLS:-true}
+      SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
+      BOOKING_FROM_EMAIL: ${BOOKING_FROM_EMAIL:-}
+      BOOKING_FROM_NAME: ${BOOKING_FROM_NAME:-Horizon Homes}
     ports:
       - "8000:8000"
     depends_on:
@@ -19,7 +31,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: http://localhost:8000
     ports:
-      - "3000:3000"
+      - "3000:80"
     depends_on:
       - api
 

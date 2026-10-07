@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from time import perf_counter
@@ -78,7 +79,13 @@ app = FastAPI(
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        origin.strip()
+        for origin in os.getenv(
+            "WEB_ORIGIN", "http://localhost:3000,http://127.0.0.1:3000"
+        ).split(",")
+        if origin.strip()
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

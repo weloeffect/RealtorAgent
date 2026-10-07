@@ -8,6 +8,7 @@ __pycache__/
 *.db
 node_modules/
 .next/
+apps/web/out/
 playwright-report/
 test-results/
 *.tsbuildinfo
